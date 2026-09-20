@@ -92,6 +92,22 @@ This repository is intended for contributors, testers, and early adopters.
 
 ---
 
+## License
+
+tDE is licensed under the **GNU General Public License v3.0 (GPLv3)**.
+
+You may copy, modify, and distribute this software under the terms of the GPLv3.
+
+For the full license text, see the included [`LICENSE`](LICENSE) file or visit:  
+https://www.gnu.org/licenses/gpl-3.0.en.html
+
+> **Attribution Request (not legally required):**  
+> If you modify, reverse-engineer, or include tDE in another project, we kindly ask that you provide credit and, if possible, contact us at **tech.enter@outlook.com**.  
+> This is a courtesy request and does not impose additional restrictions beyond the GPLv3.
+
+
+---
+
 ## Building tDE (experimental)
 
 tDE uses **CMake** (planned) or a simple build script depending on the component.
