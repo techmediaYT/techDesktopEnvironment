@@ -118,7 +118,8 @@ Example (placeholder):
 mkdir tDE 
 cd tDE
 cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build tDE
+cmake --build ..
+
 ```
 
 ---
