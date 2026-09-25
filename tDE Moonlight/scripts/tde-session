@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+#
+# tde-session -- launches tDE Moonlight's components and supervises
+# them. If a core component (topbar or dock) crashes, this offers to
+# save a local crash report and falls back to a GNOME session.
+#
+# Deliberately a shell-level supervisor, not per-app internal signal
+# handlers: running C++ code inside a process that just crashed (e.g.
+# from a SIGSEGV handler) is unreliable -- the crash may have left
+# memory/locks in a bad state, and the handler can itself crash before
+# finishing. A separate supervisor process watching exit codes from
+# outside is the standard, safer pattern real DEs use.
+#
+# Known limitations, stated plainly rather than oversold:
+#   - "Send report" currently only saves a local crash log under
+#     ~/.local/share/tde/crash-reports/ -- there's no backend to
+#     actually submit it anywhere yet. That's a real follow-up, not
+#     implemented here.
+#   - The GNOME fallback runs `gnome-session` directly. Whether that
+#     produces a fully working desktop depends on how the session was
+#     originally started (display manager, systemd user session type,
+#     etc) -- this is a reasonable v1, not a guaranteed clean handoff
+#     in every possible session-management setup. A more robust
+#     version would integrate with the login manager (e.g. registering
+#     a proper session type in GDM and requesting a session switch via
+#     logind) rather than just execing a binary.
+
+set -uo pipefail
+
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CRASH_LOG_DIR="$HOME/.local/share/tde/crash-reports"
+mkdir -p "$CRASH_LOG_DIR"
+
+# SIGSEGV/SIGABRT/etc exit as 128+signal from bash's perspective.
+is_crash_exit() {
+    local code=$1
+    [[ "$code" -ge 128 ]]
+}
+
+show_crash_prompt() {
+    local component="$1"
+    local logfile="$2"
+
+    local message="tDE Moonlight's $component crashed unexpectedly.\n\nA crash log has been saved to:\n$logfile\n\nWould you like to fall back to a GNOME session?"
+
+    if command -v zenity >/dev/null 2>&1; then
+        zenity --question --title="tDE Moonlight" --text="$message" --width=400
+        return $?
+    elif command -v kdialog >/dev/null 2>&1; then
+        kdialog --yesno "$message"
+        return $?
+    else
+        # No dialog tool available -- fall back to a plain terminal
+        # prompt rather than silently deciding for the user.
+        echo "tDE Moonlight: $component crashed. Log: $logfile" >&2
+        read -r -p "Fall back to GNOME session? [y/N] " reply
+        [[ "$reply" =~ ^[Yy]$ ]]
+        return $?
+    fi
+}
+
+fallback_to_gnome() {
+    echo "tde-session: falling back to GNOME session..." >&2
+    # Kill any surviving tDE components before handing off, so they
+    # don't fight GNOME Shell for the same layer-shell/panel space.
+    pkill -f tde-topbar 2>/dev/null
+    pkill -f tde-dock 2>/dev/null
+    pkill -f tde-wallpaper 2>/dev/null
+    pkill -f tde-daemon 2>/dev/null
+
+    if command -v gnome-session >/dev/null 2>&1; then
+        exec gnome-session
+    else
+        echo "tde-session: gnome-session not found on this system -- cannot fall back." >&2
+        exit 1
+    fi
+}
+
+write_crash_log() {
+    local component="$1"
+    local exit_code="$2"
+    local timestamp
+    timestamp="$(date +%Y%m%d-%H%M%S)"
+    local logfile="$CRASH_LOG_DIR/${component}-${timestamp}.log"
+
+    {
+        echo "Component: $component"
+        echo "Exit code: $exit_code"
+        echo "Timestamp: $(date -Iseconds)"
+        echo "Kernel: $(uname -a)"
+        echo "--- Last 50 lines of component output are not captured by this script yet;"
+        echo "    redirect the component's own stdout/stderr to a file if you need that. ---"
+    } > "$logfile"
+
+    echo "$logfile"
+}
+
+echo "tde-session: starting tDE Moonlight components..."
+
+"$BIN_DIR/tde-daemon" &
+DAEMON_PID=$!
+sleep 0.5  # give the daemon a moment to register on D-Bus before dock/topbar query it
+
+"$BIN_DIR/tde-topbar" &
+TOPBAR_PID=$!
+
+"$BIN_DIR/tde-dock" &
+DOCK_PID=$!
+
+"$BIN_DIR/tde-wallpaper" &
+WALLPAPER_PID=$!
+
+# Wait for whichever core component (topbar or dock) exits first. The
+# daemon and wallpaper aren't treated as crash-worthy here -- losing
+# the wallpaper is cosmetic, and the daemon restarting cleanly is a
+# separate concern from "the visible desktop broke."
+while true; do
+    if ! kill -0 "$TOPBAR_PID" 2>/dev/null; then
+        wait "$TOPBAR_PID"
+        code=$?
+        component="topbar"
+        break
+    fi
+    if ! kill -0 "$DOCK_PID" 2>/dev/null; then
+        wait "$DOCK_PID"
+        code=$?
+        component="dock"
+        break
+    fi
+    sleep 1
+done
+
+if is_crash_exit "$code"; then
+    logfile=$(write_crash_log "$component" "$code")
+    if show_crash_prompt "$component" "$logfile"; then
+        fallback_to_gnome
+    else
+        echo "tde-session: user declined GNOME fallback after $component crash. Exiting." >&2
+        exit "$code"
+    fi
+else
+    echo "tde-session: $component exited normally (code $code)."
+fi
