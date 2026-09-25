@@ -110,17 +110,26 @@ https://www.gnu.org/licenses/gpl-3.0.en.html
 
 ## Building tDE (experimental)
 
-tDE uses **CMake** (planned) or a simple build script depending on the component.
+tDE uses **CMake** for building the executables.
 
 Example (placeholder):
 
 ```bash
 mkdir tDE 
 cd tDE
-cmake ..
-make -j$(nproc)
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build tDE
 ```
-# Build platforms
+
+---
+
+## Active bugs
+
+tDE currently has bugs all round, with the only component working being **tde-topbar**. We apologize for this situation, and we'll fix it soon. We would be truly thankful if you, the downloader, would fix the issue, but we're also working on it. If you do fix it, contact us on GitHub or via [email](mailto:tech.enter@outlook.com).
+
+---
+
+## Build platforms
 
 <p align="left">
   <img src="https://www.qt.io/hubfs/built-with-Qt-badge-white.svg" alt="Built with Qt" width="512">
