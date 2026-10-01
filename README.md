@@ -127,7 +127,7 @@ cmake --build ..
 
 ## Active bugs
 
-tDE currently has bugs all round, with the only component working being **tde-topbar**. We apologize for this situation, and we'll fix it soon. We would be truly thankful if you, the downloader, would fix the issue, but we're also working on it. If you do fix it, contact us on GitHub or via [email](mailto:tech.enter@outlook.com).
+tDE now is fully functional, and ready for testing. Please use the files in the **main branch**, not the release. If you have any questions, please contact us at [our email.](mailto:tech.enter@outlook.com)
 
 ---
 
